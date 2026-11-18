@@ -1,0 +1,57 @@
+# ============================================================
+# QwenVL-MICL-Assistant 默认配置
+# ============================================================
+
+project:
+  name: QwenVL-MICL-Assistant
+  student_id: <学号>
+  student_name: <姓名>
+  track: "02-Multimodal"
+
+model:
+  # 本地 4070 12GB 用 3B 跑通流程，远程 3090 用 7B 出正式结果
+  name_or_path: "Qwen/Qwen2.5-VL-7B-Instruct"
+  torch_dtype: "bfloat16"
+  max_pixels: 12845056        # 高清图像动态分辨率上限
+  min_pixels: 3136
+
+# 检索式 MICL（创新点 C1）
+retriever:
+  enabled: true
+  method: "clip+reward"       # clip | clip+reward
+  top_k: 4                    # in-context demo 数量
+  clip_model: "openai/clip-vit-base-patch32"
+  reward_model: null          # 预留：CLIP + Qwen reward 重排
+
+data:
+  train_datasets: ["ChartQA", "DocVQA"]
+  eval_dataset: "ChartQA"
+  demo_pool_size: 2000        # 检索池规模
+  val_split: 0.1
+  seed: 42
+
+# QLoRA 微调（创新点 C2）
+train:
+  output_dir: "outputs/qlora"
+  num_epochs: 3
+  per_device_batch_size: 1
+  gradient_accumulation_steps: 16
+  learning_rate: 2.0e-4
+  lora_rank: 16               # 消融：8 / 16 / 32
+  lora_alpha: 32
+  lora_dropout: 0.05
+  target_modules: ["q_proj", "k_proj", "v_proj", "o_proj"]
+  unfreeze_projector: false   # 消融：是否解冻视觉投影层
+  quantization_bit: 4
+
+# 视频帧采样（核心功能 C3）
+video:
+  num_frames: 8
+  sample_strategy: "uniform"  # uniform | head-tail
+
+# 评测（C4）
+eval:
+  metrics: ["chartqa_acc", "docvqa_acc"]
+  use_gpt4o_judge: true
+  judge_model: "gpt-4o"
+  judge_api_key_env: "OPENAI_API_KEY"

@@ -1,0 +1,27 @@
+# 核心框架
+torch>=2.1.0
+transformers>=4.45.0
+accelerate>=0.34.0
+peft>=0.13.0
+bitsandbytes>=0.43.0
+
+# 数据处理
+datasets>=2.19.0
+Pillow>=10.0.0
+numpy>=1.26.0
+PyYAML>=6.0.1
+
+# 多模态工具
+qwen-vl-utils>=0.0.8
+decord>=0.6.0
+
+# demo 检索（创新点 C1）
+sentence-transformers>=3.0.0
+scikit-learn>=1.5.0
+
+# 交互 Demo
+gradio>=4.44.0
+
+# 评测 / GPT-4o judge
+openai>=1.40.0
+tqdm>=4.66.0

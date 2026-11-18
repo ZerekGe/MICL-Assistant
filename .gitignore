@@ -1,0 +1,52 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# --- 依赖与构建 ---
+dist/
+build/
+*.whl
+
+# --- 模型权重与大数据 ---
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.gguf
+checkpoints/
+outputs/
+runs/
+
+# --- 数据集 ---
+data/
+datasets/
+*.parquet
+*.jsonl
+*.h5
+*.zip
+
+# --- 日志与缓存 ---
+*.log
+logs/
+.cache/
+.cache_hf/
+*.tmp
+
+# ---  notebook ---
+.ipynb_checkpoints/
+
+# --- 编辑器 / 系统 ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- 密钥 ---
+.env
+.env.*
+!.env.example
