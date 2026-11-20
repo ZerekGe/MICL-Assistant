@@ -4,8 +4,8 @@
 
 project:
   name: QwenVL-MICL-Assistant
-  student_id: <学号>
-  student_name: <姓名>
+  student_id: "<学号>"
+  student_name: "<姓名>"
   track: "02-Multimodal"
 
 model:
