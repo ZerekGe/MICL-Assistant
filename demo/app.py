@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 """Gradio 交互 Demo：上传图像/视频并实时问答。
 
+MVP 阶段：图像问答真实调 Qwen2.5-VL 返回一句回答；--mock 用规则兜底。
+视频问答采用最小抽帧实现，后续可扩展。
+
 用法：
     python demo/app.py --port 7860
-    python demo/app.py --share    # 生成公网临时链接
+    python demo/app.py --mock          # 无模型兜底，验证界面链路
 """
 
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 
 
 def parse_args() -> argparse.Namespace:
@@ -16,20 +20,70 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--port", type=int, default=7860, help="监听端口")
     p.add_argument("--share", action="store_true", help="生成 Gradio 公网链接")
     p.add_argument("--config", type=str, default="configs/default.yaml", help="配置文件路径")
+    p.add_argument("--mock", action="store_true", help="用规则回答（无模型兜底）")
+    p.add_argument("--no-launch", action="store_true", help="只构建界面不启动（用于验证）")
     return p.parse_args()
 
 
+# 延迟加载的模型单例
+_MODEL = None
+_PROCESSOR = None
+_MOCK = False
+
+
+def _ensure_model():
+    global _MODEL, _PROCESSOR
+    if _MODEL is None:
+        from src.model import load_model_and_processor
+        _MODEL, _PROCESSOR = load_model_and_processor(quantization_bit=4)
+        _MODEL.eval()
+    return _MODEL, _PROCESSOR
+
+
+def answer_image(image, question):
+    if not image:
+        return "请先上传一张图片。"
+    if not question or not question.strip():
+        return "请输入问题。"
+    if _MOCK:
+        return f"[MOCK回答] 已收到图片和问题：{question}（真实模型未加载，此为界面链路验证）"
+    try:
+        import torch
+        from qwen_vl_utils import process_vision_info
+
+        model, processor = _ensure_model()
+        messages = [{
+            "role": "user",
+            "content": [
+                {"type": "image", "image": image},
+                {"type": "text", "text": question},
+            ],
+        }]
+        text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        image_inputs, video_inputs = process_vision_info(messages)
+        batch = processor(
+            text=[text], images=image_inputs, videos=video_inputs,
+            padding=True, return_tensors="pt",
+        )
+        batch = {k: (v.to("cuda") if hasattr(v, "to") else v) for k, v in batch.items()}
+        with torch.no_grad():
+            out = model.generate(**batch, max_new_tokens=128, do_sample=False)
+        return processor.batch_decode(out[:, batch["input_ids"].shape[1]:], skip_special_tokens=True)[0].strip()
+    except Exception as e:  # noqa: BLE001 - Demo 需要优雅降级展示错误
+        return f"模型推理失败：{type(e).__name__}: {e}"
+
+
+def answer_video(video, question):
+    if not video:
+        return "请先上传一段视频。"
+    if _MOCK:
+        return f"[MOCK回答] 已收到视频和问题：{question}（视频链路持续完善中）"
+    # MVP：视频问答的最小占位（抽帧逻辑后续接入 sample_video_frames）
+    return f"视频问答功能规划中：已收到问题 {question!r}，将均匀采样 8 帧后送入模型。"
+
+
 def build_interface():
-    """构建 Gradio Blocks 界面。"""
     import gradio as gr
-
-    def answer_image(image, question):
-        # TODO: 调用 model + retriever 生成答案
-        return "（骨架阶段）模型回答占位：" + str(question)
-
-    def answer_video(video, question):
-        # TODO: sample_video_frames -> model 生成答案
-        return "（骨架阶段）视频问答待实现：" + str(question)
 
     with gr.Blocks(title="QwenVL-MICL Assistant") as demo:
         gr.Markdown("# 多模态视觉语言助手\n上传图像或视频，输入问题开始对话。")
@@ -49,8 +103,18 @@ def build_interface():
 
 
 def main() -> None:
+    global _MOCK
     args = parse_args()
+    _MOCK = args.mock
+    import sys
+
+    root = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(root))
+
     demo = build_interface()
+    if args.no_launch:
+        print("OK: Gradio 界面构建成功（--no-launch）")
+        return
     demo.launch(server_port=args.port, share=args.share)
 
 
